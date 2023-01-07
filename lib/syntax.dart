@@ -400,8 +400,7 @@ class ClassDefinition {
   String get _copyWithGenFunc {
     if (!isEntity) return '';
     final sb = new StringBuffer();
-    sb.write(
-        '${isEntity ? '${name}Entity' : '${name}Model'} copyWith({$_fieldListCopyWith}) {\n');
+    sb.write('${name}Entity copyWith({$_fieldListCopyWith}) {\n');
     sb.write('\treturn ${name}Entity(\n');
     fields.keys.forEach((k) {
       sb.write('\t\t${fields[k]!.copyWithParseExpression(k)},');
