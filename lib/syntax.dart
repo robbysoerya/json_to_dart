@@ -360,16 +360,17 @@ class ClassDefinition {
   String get _jsonParseFunc {
     if (isEntity) return '';
     final sb = new StringBuffer();
-    sb.write('\tfactory $name');
+    sb.write('\tfactory ${isEntity ? '${name}Entity' : '${name}Model'}');
     sb.write(
-        '.fromJson(Map<String, dynamic> json) =>\t_${name}FromJson(json);');
+        '.fromJson(Map<String, dynamic> json) =>\t_${isEntity ? '${name}Entity' : '${name}Model'}FromJson(json);');
     return sb.toString();
   }
 
   String get _jsonGenFunc {
     if (isEntity) return '';
     final sb = new StringBuffer();
-    sb.write('\tMap<String, dynamic> toJson() => _${name}ToJson(this);');
+    sb.write(
+        '\tMap<String, dynamic> toJson() => _${isEntity ? '${name}Entity' : '${name}Model'}ToJson(this);');
     return sb.toString();
   }
 
@@ -399,7 +400,8 @@ class ClassDefinition {
   String get _copyWithGenFunc {
     if (!isEntity) return '';
     final sb = new StringBuffer();
-    sb.write('$name copyWith({$_fieldListCopyWith}) {\n');
+    sb.write(
+        '${isEntity ? '${name}Entity' : '${name}Model'} copyWith({$_fieldListCopyWith}) {\n');
     sb.write('\treturn ${name}Entity(\n');
     fields.keys.forEach((k) {
       sb.write('\t\t${fields[k]!.copyWithParseExpression(k)},');
