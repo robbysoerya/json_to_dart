@@ -243,19 +243,46 @@ class ClassDefinition {
   }
 
   void _addTypeDef(TypeDefinition typeDef, StringBuffer sb) {
-    sb.write('final ${typeDef.name}');
+    final extName = isEntity ? 'Entity' : 'Model';
+    if (typeDef.isPrimitive) {
+      sb.write('final ${typeDef.name}');
+    } else {
+      if (typeDef.name == 'List') {
+        sb.write('final ${typeDef.name}');
+      } else {
+        sb.write('final ${typeDef.name}$extName');
+      }
+    }
+
     if (typeDef.subtype != null) {
-      sb.write('<${typeDef.subtype}>');
+      if (typeDef.isPrimitiveList) {
+        sb.write('<${typeDef.subtype}>');
+      } else {
+        sb.write('<${typeDef.subtype}$extName>');
+      }
     }
   }
 
   void _addTypeDefCopyWith(TypeDefinition typeDef, StringBuffer sb) {
-    sb.write('${typeDef.name}');
-    if (typeDef.subtype != null) {
-      sb.write('<${typeDef.subtype}>?');
+    final extName = isEntity ? 'Entity' : 'Model';
+    if (typeDef.isPrimitive) {
+      sb.write('${typeDef.name}');
     } else {
-      sb.write('?');
+      if (typeDef.name == 'List') {
+        sb.write('${typeDef.name}');
+      } else {
+        sb.write('${typeDef.name}$extName');
+      }
     }
+
+    if (typeDef.subtype != null) {
+      if (typeDef.isPrimitiveList) {
+        sb.write('<${typeDef.subtype}>');
+      } else {
+        sb.write('<${typeDef.subtype}$extName>');
+      }
+    }
+    sb.write('?');
   }
 
   String get _fieldList {
@@ -360,17 +387,16 @@ class ClassDefinition {
   String get _jsonParseFunc {
     if (isEntity) return '';
     final sb = new StringBuffer();
-    sb.write('\tfactory ${isEntity ? '${name}Entity' : '${name}Model'}');
+    sb.write('\tfactory ${name}Model');
     sb.write(
-        '.fromJson(Map<String, dynamic> json) =>\t_${isEntity ? '${name}Entity' : '${name}Model'}FromJson(json);');
+        '.fromJson(Map<String, dynamic> json) =>\t_\$${name}ModelFromJson(json);');
     return sb.toString();
   }
 
   String get _jsonGenFunc {
     if (isEntity) return '';
     final sb = new StringBuffer();
-    sb.write(
-        '\tMap<String, dynamic> toJson() => _${isEntity ? '${name}Entity' : '${name}Model'}ToJson(this);');
+    sb.write('\tMap<String, dynamic> toJson() => _\$${name}ModelToJson(this);');
     return sb.toString();
   }
 
