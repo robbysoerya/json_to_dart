@@ -7,7 +7,7 @@ void main() {
     test("should generate proper warnings", () {
       final jsonRawData =
           new File("test_resources/test_warnings.json").readAsStringSync();
-      final ModelGenerator modelGenerator = new ModelGenerator("Warnings");
+      final ModelGenerator modelGenerator = new ModelGenerator("Warnings",false);
       DartCode dartCode = modelGenerator.generateUnsafeDart(jsonRawData);
       expect(dartCode.warnings, isNot(null));
       expect(dartCode.warnings.length, equals(4));

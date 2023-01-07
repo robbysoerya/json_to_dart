@@ -8,7 +8,7 @@ void main() {
     test("Should generate the classes to parse the JSON", () {
       final jsonRawData =
           new File("test_resources/bug_40.json").readAsStringSync();
-      final generator = ModelGenerator('BugForty');
+      final generator = ModelGenerator('BugForty',false);
       final dartCode = generator.generateDartClasses(jsonRawData);
       expect(dartCode.warnings.length, equals(1));
       expect(dartCode.warnings[0].warning, equals("list is empty"));

@@ -10,7 +10,7 @@ void main() {
     test("Should generate the classes to parse the JSON", () {
       final jsonRawData =
           new File("test_resources/bug_10.json").readAsStringSync();
-      final generator = ModelGenerator('BugTen');
+      final generator = ModelGenerator('BugTen',false);
       final dartCode = generator.generateDartClasses(jsonRawData);
       expect(dartCode.warnings.length, equals(0));
       expect(dartCode.code.contains('class GlossDiv'), equals(true));
