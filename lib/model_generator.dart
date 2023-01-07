@@ -22,11 +22,12 @@ class Hint {
 class ModelGenerator {
   final String _rootClassName;
   final bool _privateFields;
+  final bool _isEntity;
   List<ClassDefinition> allClasses = <ClassDefinition>[];
   final Map<String, String> sameClassMapping = new HashMap<String, String>();
   late List<Hint> hints;
 
-  ModelGenerator(this._rootClassName, [this._privateFields = false, hints]) {
+  ModelGenerator(this._rootClassName, [this._isEntity = false, this._privateFields = false, hints]) {
     if (hints != null) {
       this.hints = hints;
     } else {
@@ -54,7 +55,7 @@ class ModelGenerator {
       final Map<dynamic, dynamic> jsonRawData = jsonRawDynamicData;
       final keys = jsonRawData.keys;
       ClassDefinition classDefinition =
-          new ClassDefinition(className, _privateFields);
+          new ClassDefinition(className, _isEntity, _privateFields);
       keys.forEach((key) {
         TypeDefinition typeDef;
         final hint = _hintForPath('$path/$key');
@@ -79,7 +80,7 @@ class ModelGenerator {
         classDefinition.addField(key, typeDef);
       });
       final similarClass = allClasses.firstWhere((cd) => cd == classDefinition,
-          orElse: () => ClassDefinition(""));
+          orElse: () => ClassDefinition("",_isEntity));
       if (similarClass.name != "") {
         final similarClassName = similarClass.name;
         final currentClassName = classDefinition.name;

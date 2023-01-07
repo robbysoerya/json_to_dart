@@ -34,7 +34,7 @@ void main() {
     test("Should identify a double number and generate the proper type", () {
       final jsonRawData =
           new File("test_resources/double.json").readAsStringSync();
-      final modelGenerator = ModelGenerator('DoubleTest');
+      final modelGenerator = ModelGenerator('DoubleTest',false);
       final dartSourceCode = modelGenerator.generateDartClasses(jsonRawData);
       final wrongDoubleRegExp = RegExp(r"^.*double int[0-9]+;$");
       final wrongIntRegExp = RegExp(r"^.*int double[0-9]+;$");

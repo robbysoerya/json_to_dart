@@ -141,6 +141,37 @@ class TypeDefinition {
     }""";
     }
   }
+
+  String entityParseExpression(String key) {
+    final fieldKey = fixFieldName(key, typeDef: this);
+    if (isPrimitive) {
+      if (name == "List") {
+        return '$fieldKey: $fieldKey';
+      }
+    } else if (name == "List") {
+      return '$fieldKey: List.from(${key}.map((e) => e.toEntity()))';
+    } else {
+      return '$fieldKey: ${key}.toEntity()';
+    }
+    return '$fieldKey: $fieldKey';
+  }
+
+  String propsParseExpression(String key) {
+    final fieldKey = fixFieldName(key, typeDef: this);
+    return '$fieldKey,';
+  }
+
+  String copyWithParseExpression(String key) {
+    final fieldKey = fixFieldName(key, typeDef: this);
+    if (isPrimitive) {
+      if (name == "List") {
+        return '$fieldKey: $fieldKey ?? this.${fieldKey}';
+      }
+    } else if (name == "List") {
+      return '$fieldKey: $key!=null ? List.from(${key}) : List.from(this.${key})';
+    }
+    return '$fieldKey: $fieldKey ?? this.${fieldKey}';
+  }
 }
 
 class Dependency {
@@ -156,9 +187,11 @@ class ClassDefinition {
   final String _name;
   final bool _privateFields;
   final Map<String, TypeDefinition> fields = new Map<String, TypeDefinition>();
+  final bool _isEntity;
 
   String get name => _name;
   bool get privateFields => _privateFields;
+  bool get isEntity => _isEntity;
 
   List<Dependency> get dependencies {
     final dependenciesList = <Dependency>[];
@@ -172,7 +205,7 @@ class ClassDefinition {
     return dependenciesList;
   }
 
-  ClassDefinition(this._name, [this._privateFields = false]);
+  ClassDefinition(this._name, this._isEntity, [this._privateFields = false]);
 
   bool operator ==(other) {
     if (other is ClassDefinition) {
@@ -210,9 +243,18 @@ class ClassDefinition {
   }
 
   void _addTypeDef(TypeDefinition typeDef, StringBuffer sb) {
-    sb.write('${typeDef.name}');
+    sb.write('final ${typeDef.name}');
     if (typeDef.subtype != null) {
       sb.write('<${typeDef.subtype}>');
+    }
+  }
+
+  void _addTypeDefCopyWith(TypeDefinition typeDef, StringBuffer sb) {
+    sb.write('${typeDef.name}');
+    if (typeDef.subtype != null) {
+      sb.write('<${typeDef.subtype}>?');
+    } else {
+      sb.write('?');
     }
   }
 
@@ -224,7 +266,20 @@ class ClassDefinition {
       final sb = new StringBuffer();
       sb.write('\t');
       _addTypeDef(f, sb);
-      sb.write('? $fieldName;');
+      sb.write(' $fieldName;');
+      return sb.toString();
+    }).join('\n');
+  }
+
+  String get _fieldListCopyWith {
+    return fields.keys.map((key) {
+      final f = fields[key]!;
+      final fieldName =
+          fixFieldName(key, typeDef: f, privateField: privateFields);
+      final sb = new StringBuffer();
+      sb.write('\n');
+      _addTypeDefCopyWith(f, sb);
+      sb.write(' $fieldName,');
       return sb.toString();
     }).join('\n');
   }
@@ -249,7 +304,7 @@ class ClassDefinition {
 
   String get _defaultPrivateConstructor {
     final sb = new StringBuffer();
-    sb.write('\t$name({');
+    sb.write('\t${isEntity ? '${name}Entity' : '${name}Model'}({');
     var i = 0;
     var len = fields.keys.length - 1;
     fields.keys.forEach((key) {
@@ -257,7 +312,7 @@ class ClassDefinition {
       final publicFieldName =
           fixFieldName(key, typeDef: f, privateField: false);
       _addTypeDef(f, sb);
-      sb.write('? $publicFieldName');
+      sb.write(' $publicFieldName');
       if (i != len) {
         sb.write(', ');
       }
@@ -280,51 +335,84 @@ class ClassDefinition {
 
   String get _defaultConstructor {
     final sb = new StringBuffer();
-    sb.write('\t$name({');
+    sb.write('\t${isEntity ? '${name}Entity' : '${name}Model'}({');
     var i = 0;
     var len = fields.keys.length - 1;
     fields.keys.forEach((key) {
       final f = fields[key]!;
       final fieldName =
           fixFieldName(key, typeDef: f, privateField: privateFields);
-      sb.write('this.$fieldName');
+      sb.write('required this.$fieldName');
       if (i != len) {
         sb.write(', ');
       }
       i++;
     });
-    sb.write('});');
+    sb.write(',});');
     return sb.toString();
   }
 
+  String get _jsonSerializeFunc {
+    if (isEntity) return '';
+    return '@JsonSerializable()';
+  }
+
   String get _jsonParseFunc {
+    if (isEntity) return '';
     final sb = new StringBuffer();
-    sb.write('\t$name');
-    sb.write('.fromJson(Map<String, dynamic> json) {\n');
-    fields.keys.forEach((k) {
-      sb.write('\t\t${fields[k]!.jsonParseExpression(k, privateFields)}\n');
-    });
-    sb.write('\t}');
+    sb.write('\tfactory $name');
+    sb.write(
+        '.fromJson(Map<String, dynamic> json) =>\t_${name}FromJson(json);');
     return sb.toString();
   }
 
   String get _jsonGenFunc {
+    if (isEntity) return '';
     final sb = new StringBuffer();
-    sb.write(
-        '\tMap<String, dynamic> toJson() {\n\t\tfinal Map<String, dynamic> data = new Map<String, dynamic>();\n');
+    sb.write('\tMap<String, dynamic> toJson() => _${name}ToJson(this);');
+    return sb.toString();
+  }
+
+  String get _entityGenFunc {
+    if (isEntity) return '';
+    final sb = new StringBuffer();
+    sb.write('\t${name}Entity toEntity() {\n');
+    sb.write('\treturn ${name}Entity(\n');
     fields.keys.forEach((k) {
-      sb.write('\t\t${fields[k]!.toJsonExpression(k, privateFields)}\n');
+      sb.write('\t\t${fields[k]!.entityParseExpression(k)},');
     });
-    sb.write('\t\treturn data;\n');
-    sb.write('\t}');
+    sb.write(');\n}');
+    return sb.toString();
+  }
+
+  String get _propsGenFunc {
+    final sb = new StringBuffer();
+    sb.write('@override\n');
+    sb.write('List<Object?> get props =>[\t');
+    fields.keys.forEach((k) {
+      sb.write('${fields[k]!.propsParseExpression(k)}');
+    });
+    sb.write('];');
+    return sb.toString();
+  }
+
+  String get _copyWithGenFunc {
+    if (!isEntity) return '';
+    final sb = new StringBuffer();
+    sb.write('$name copyWith({$_fieldListCopyWith}) {\n');
+    sb.write('\treturn ${name}Entity(\n');
+    fields.keys.forEach((k) {
+      sb.write('\t\t${fields[k]!.copyWithParseExpression(k)},');
+    });
+    sb.write(');\n}');
     return sb.toString();
   }
 
   String toString() {
     if (privateFields) {
-      return 'class $name {\n$_fieldList\n\n$_defaultPrivateConstructor\n\n$_gettersSetters\n\n$_jsonParseFunc\n\n$_jsonGenFunc\n}\n';
+      return '$_jsonSerializeFunc\nclass ${isEntity ? '${name}Entity' : '${name}Model'} extends Equatable{\n$_fieldList\n\n$_defaultPrivateConstructor\n\n$_gettersSetters\n\n$_jsonParseFunc\n\n$_jsonGenFunc\n\n$_entityGenFunc\n\n$_copyWithGenFunc\n\n$_propsGenFunc\n}\n';
     } else {
-      return 'class $name {\n$_fieldList\n\n$_defaultConstructor\n\n$_jsonParseFunc\n\n$_jsonGenFunc\n}\n';
+      return '$_jsonSerializeFunc\nclass ${isEntity ? '${name}Entity' : '${name}Model'} extends Equatable {\n$_fieldList\n\n$_defaultConstructor\n\n$_jsonParseFunc\n\n$_jsonGenFunc\n\n$_entityGenFunc\n\n$_propsGenFunc\n\n$_copyWithGenFunc\n}\n';
     }
   }
 }
