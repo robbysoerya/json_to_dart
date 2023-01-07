@@ -14,7 +14,7 @@ String _scriptPath() {
 }
 
 main() {
-  final classGenerator = new ModelGenerator('Sample',false);
+  final classGenerator = new ModelGenerator('Sample',false,true);
   final currentDirectory = dirname(_scriptPath());
   final filePath = normalize(join(currentDirectory, 'sample.json'));
   final jsonRawData = new File(filePath).readAsStringSync();

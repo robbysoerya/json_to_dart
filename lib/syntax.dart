@@ -188,10 +188,12 @@ class ClassDefinition {
   final bool _privateFields;
   final Map<String, TypeDefinition> fields = new Map<String, TypeDefinition>();
   final bool _isEntity;
+  final bool _useFreezed;
 
   String get name => _name;
   bool get privateFields => _privateFields;
   bool get isEntity => _isEntity;
+  bool get useFreezed => _useFreezed;
 
   List<Dependency> get dependencies {
     final dependenciesList = <Dependency>[];
@@ -205,7 +207,8 @@ class ClassDefinition {
     return dependenciesList;
   }
 
-  ClassDefinition(this._name, this._isEntity, [this._privateFields = false]);
+  ClassDefinition(this._name, this._isEntity, this._useFreezed,
+      [this._privateFields = false]);
 
   bool operator ==(other) {
     if (other is ClassDefinition) {
@@ -263,6 +266,27 @@ class ClassDefinition {
     }
   }
 
+  void _addTypeDefRequired(TypeDefinition typeDef, StringBuffer sb) {
+    final extName = isEntity ? 'Entity' : 'Model';
+    if (typeDef.isPrimitive) {
+      sb.write('required ${typeDef.name}');
+    } else {
+      if (typeDef.name == 'List') {
+        sb.write('required ${typeDef.name}');
+      } else {
+        sb.write('required ${typeDef.name}$extName');
+      }
+    }
+
+    if (typeDef.subtype != null) {
+      if (typeDef.isPrimitiveList) {
+        sb.write('<${typeDef.subtype}>');
+      } else {
+        sb.write('<${typeDef.subtype}$extName>');
+      }
+    }
+  }
+
   void _addTypeDefCopyWith(TypeDefinition typeDef, StringBuffer sb) {
     final extName = isEntity ? 'Entity' : 'Model';
     if (typeDef.isPrimitive) {
@@ -294,6 +318,19 @@ class ClassDefinition {
       sb.write('\t');
       _addTypeDef(f, sb);
       sb.write(' $fieldName;');
+      return sb.toString();
+    }).join('\n');
+  }
+
+  String get _fieldListRequired {
+    return fields.keys.map((key) {
+      final f = fields[key]!;
+      final fieldName =
+          fixFieldName(key, typeDef: f, privateField: privateFields);
+      final sb = new StringBuffer();
+      sb.write('\t');
+      _addTypeDefRequired(f, sb);
+      sb.write(' $fieldName,');
       return sb.toString();
     }).join('\n');
   }
@@ -362,24 +399,19 @@ class ClassDefinition {
 
   String get _defaultConstructor {
     final sb = new StringBuffer();
-    sb.write('\t${isEntity ? '${name}Entity' : '${name}Model'}({');
-    var i = 0;
-    var len = fields.keys.length - 1;
-    fields.keys.forEach((key) {
-      final f = fields[key]!;
-      final fieldName =
-          fixFieldName(key, typeDef: f, privateField: privateFields);
-      sb.write('required this.$fieldName');
-      if (i != len) {
-        sb.write(', ');
-      }
-      i++;
-    });
-    sb.write(',});');
+    sb.write(
+        '\t${useFreezed ? 'const factory ' : ''}${isEntity ? '${name}Entity' : '${name}Model'}({');
+    sb.write(_fieldListRequired);
+    sb.write('})');
+    if (useFreezed) {
+      sb.write(' = _${isEntity ? '${name}Entity' : '${name}Model'}');
+    }
+    sb.write(';');
     return sb.toString();
   }
 
-  String get _jsonSerializeFunc {
+  String get _generatorTypeFunc {
+    if (useFreezed) return '@freezed';
     if (isEntity) return '';
     return '@JsonSerializable()';
   }
@@ -394,6 +426,7 @@ class ClassDefinition {
   }
 
   String get _jsonGenFunc {
+    if (useFreezed) return '';
     if (isEntity) return '';
     final sb = new StringBuffer();
     sb.write('\tMap<String, dynamic> toJson() => _\$${name}ModelToJson(this);');
@@ -402,6 +435,7 @@ class ClassDefinition {
 
   String get _entityGenFunc {
     if (isEntity) return '';
+    if (useFreezed) return '';
     final sb = new StringBuffer();
     sb.write('\t${name}Entity toEntity() {\n');
     sb.write('\treturn ${name}Entity(\n');
@@ -413,6 +447,7 @@ class ClassDefinition {
   }
 
   String get _propsGenFunc {
+    if (useFreezed) return '';
     final sb = new StringBuffer();
     sb.write('@override\n');
     sb.write('List<Object?> get props =>[\t');
@@ -424,6 +459,7 @@ class ClassDefinition {
   }
 
   String get _copyWithGenFunc {
+    if (useFreezed) return '';
     if (!isEntity) return '';
     final sb = new StringBuffer();
     sb.write('${name}Entity copyWith({$_fieldListCopyWith}) {\n');
@@ -435,11 +471,42 @@ class ClassDefinition {
     return sb.toString();
   }
 
+  String get _withInherite {
+    final sb = new StringBuffer();
+    if (useFreezed) {
+      sb.write(' with _\$${isEntity ? '${name}Entity' : '${name}Model'}');
+    } else {
+      sb.write(' extends Equatable');
+    }
+    return sb.toString();
+  }
+
+  String get _extEntity {
+    final sb = new StringBuffer();
+    sb.write('\t${name}Entity toEntity() {\n');
+    sb.write('\treturn ${name}Entity(\n');
+    fields.keys.forEach((k) {
+      sb.write('\t\t${fields[k]!.entityParseExpression(k)},');
+    });
+    sb.write(');\n}');
+    return sb.toString();
+  }
+
+  String get _withExtension {
+    if (isEntity) return '';
+    if (!useFreezed) return '';
+    final sb = new StringBuffer();
+    sb.write('extension ${name}ModelX on ${name}Model {\n');
+    sb.write(_extEntity);
+    sb.write('\n}');
+    return sb.toString();
+  }
+
   String toString() {
     if (privateFields) {
-      return '$_jsonSerializeFunc\nclass ${isEntity ? '${name}Entity' : '${name}Model'} extends Equatable{\n$_fieldList\n\n$_defaultPrivateConstructor\n\n$_gettersSetters\n\n$_jsonParseFunc\n\n$_jsonGenFunc\n\n$_entityGenFunc\n\n$_copyWithGenFunc\n\n$_propsGenFunc\n}\n';
+      return '$_generatorTypeFunc\nclass ${isEntity ? '${name}Entity' : '${name}Model'}${_withInherite}{\n$_defaultPrivateConstructor\n\n$_gettersSetters\n\n$_jsonParseFunc\n\n$_jsonGenFunc\n\n$_entityGenFunc\n\n$_copyWithGenFunc\n\n$_propsGenFunc\n}\n$_withExtension';
     } else {
-      return '$_jsonSerializeFunc\nclass ${isEntity ? '${name}Entity' : '${name}Model'} extends Equatable {\n$_fieldList\n\n$_defaultConstructor\n\n$_jsonParseFunc\n\n$_jsonGenFunc\n\n$_entityGenFunc\n\n$_propsGenFunc\n\n$_copyWithGenFunc\n}\n';
+      return '$_generatorTypeFunc\nclass ${isEntity ? '${name}Entity' : '${name}Model'}${_withInherite}{\n$_defaultConstructor\n\n$_jsonParseFunc\n\n$_jsonGenFunc\n\n$_entityGenFunc\n\n$_propsGenFunc\n\n$_copyWithGenFunc\n}\n$_withExtension';
     }
   }
 }
