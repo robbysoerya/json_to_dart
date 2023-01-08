@@ -498,7 +498,7 @@ class ClassDefinition {
     final sb = new StringBuffer();
     if (useFreezed) {
       if (useRequest) {
-        sb.write(' with Request${name}Model');
+        sb.write(' with _\$Request${name}Model');
       } else {
         sb.write(' with _\$${isEntity ? '${name}Entity' : '${name}Model'}');
       }
