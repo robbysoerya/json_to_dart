@@ -24,6 +24,7 @@ class ModelGenerator {
   final bool _privateFields;
   final bool _isEntity;
   final bool _useFreezed;
+  final bool _useRequest;
   List<ClassDefinition> allClasses = <ClassDefinition>[];
   final Map<String, String> sameClassMapping = new HashMap<String, String>();
   late List<Hint> hints;
@@ -32,6 +33,7 @@ class ModelGenerator {
     this._rootClassName, [
     this._isEntity = false,
     this._useFreezed = true,
+    this._useRequest = false,
     this._privateFields = false,
     hints,
   ]) {
@@ -49,6 +51,7 @@ class ModelGenerator {
     if (hint.path == "") {
       return null;
     }
+    return null;
   }
 
   List<Warning> _generateClassDefinition(String className,
@@ -61,8 +64,8 @@ class ModelGenerator {
     } else {
       final Map<dynamic, dynamic> jsonRawData = jsonRawDynamicData;
       final keys = jsonRawData.keys;
-      ClassDefinition classDefinition =
-          new ClassDefinition(className, _isEntity, _useFreezed, _privateFields);
+      ClassDefinition classDefinition = new ClassDefinition(
+          className, _isEntity, _useFreezed, _useRequest, _privateFields);
       keys.forEach((key) {
         TypeDefinition typeDef;
         final hint = _hintForPath('$path/$key');
@@ -87,7 +90,7 @@ class ModelGenerator {
         classDefinition.addField(key, typeDef);
       });
       final similarClass = allClasses.firstWhere((cd) => cd == classDefinition,
-          orElse: () => ClassDefinition("", _isEntity, _useFreezed));
+          orElse: () => ClassDefinition("", _isEntity, _useFreezed, _useRequest));
       if (similarClass.name != "") {
         final similarClassName = similarClass.name;
         final currentClassName = classDefinition.name;

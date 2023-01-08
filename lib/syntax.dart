@@ -189,11 +189,13 @@ class ClassDefinition {
   final Map<String, TypeDefinition> fields = new Map<String, TypeDefinition>();
   final bool _isEntity;
   final bool _useFreezed;
+  final bool _useRequest;
 
   String get name => _name;
   bool get privateFields => _privateFields;
   bool get isEntity => _isEntity;
   bool get useFreezed => _useFreezed;
+  bool get useRequest => _useRequest;
 
   List<Dependency> get dependencies {
     final dependenciesList = <Dependency>[];
@@ -207,7 +209,8 @@ class ClassDefinition {
     return dependenciesList;
   }
 
-  ClassDefinition(this._name, this._isEntity, this._useFreezed,
+  ClassDefinition(
+      this._name, this._isEntity, this._useFreezed, this._useRequest,
       [this._privateFields = false]);
 
   bool operator ==(other) {
@@ -274,7 +277,11 @@ class ClassDefinition {
       if (typeDef.name == 'List') {
         sb.write('required ${typeDef.name}');
       } else {
-        sb.write('required ${typeDef.name}$extName');
+        if (useRequest) {
+          sb.write('required Request${typeDef.name}$extName');
+        } else {
+          sb.write('required ${typeDef.name}$extName');
+        }
       }
     }
 
@@ -282,7 +289,11 @@ class ClassDefinition {
       if (typeDef.isPrimitiveList) {
         sb.write('<${typeDef.subtype}>');
       } else {
-        sb.write('<${typeDef.subtype}$extName>');
+        if (useRequest) {
+          sb.write('<Request${typeDef.subtype}$extName>');
+        } else {
+          sb.write('<${typeDef.subtype}$extName>');
+        }
       }
     }
   }
@@ -309,18 +320,18 @@ class ClassDefinition {
     sb.write('?');
   }
 
-  String get _fieldList {
-    return fields.keys.map((key) {
-      final f = fields[key]!;
-      final fieldName =
-          fixFieldName(key, typeDef: f, privateField: privateFields);
-      final sb = new StringBuffer();
-      sb.write('\t');
-      _addTypeDef(f, sb);
-      sb.write(' $fieldName;');
-      return sb.toString();
-    }).join('\n');
-  }
+  // String get _fieldList {
+  //   return fields.keys.map((key) {
+  //     final f = fields[key]!;
+  //     final fieldName =
+  //         fixFieldName(key, typeDef: f, privateField: privateFields);
+  //     final sb = new StringBuffer();
+  //     sb.write('\t');
+  //     _addTypeDef(f, sb);
+  //     sb.write(' $fieldName;');
+  //     return sb.toString();
+  //   }).join('\n');
+  // }
 
   String get _fieldListRequired {
     return fields.keys.map((key) {
@@ -399,12 +410,20 @@ class ClassDefinition {
 
   String get _defaultConstructor {
     final sb = new StringBuffer();
-    sb.write(
-        '\t${useFreezed ? 'const factory ' : ''}${isEntity ? '${name}Entity' : '${name}Model'}({');
+    if (useRequest) {
+      sb.write('\tconst factory Request${name}Model({');
+    } else {
+      sb.write(
+          '\t${useFreezed ? 'const factory ' : ''}${isEntity ? '${name}Entity' : '${name}Model'}({');
+    }
     sb.write(_fieldListRequired);
     sb.write('})');
     if (useFreezed) {
-      sb.write(' = _${isEntity ? '${name}Entity' : '${name}Model'}');
+      if (useRequest) {
+        sb.write(' = _Request${name}Model');
+      } else {
+        sb.write(' = _${isEntity ? '${name}Entity' : '${name}Model'}');
+      }
     }
     sb.write(';');
     return sb.toString();
@@ -419,7 +438,11 @@ class ClassDefinition {
   String get _jsonParseFunc {
     if (isEntity) return '';
     final sb = new StringBuffer();
-    sb.write('\tfactory ${name}Model');
+    if (useRequest) {
+      sb.write('\tfactory Request${name}Model');
+    } else {
+      sb.write('\tfactory ${name}Model');
+    }
     sb.write(
         '.fromJson(Map<String, dynamic> json) =>\t_\$${name}ModelFromJson(json);');
     return sb.toString();
@@ -474,7 +497,11 @@ class ClassDefinition {
   String get _withInherite {
     final sb = new StringBuffer();
     if (useFreezed) {
-      sb.write(' with _\$${isEntity ? '${name}Entity' : '${name}Model'}');
+      if (useRequest) {
+        sb.write(' with Request${name}Model');
+      } else {
+        sb.write(' with _\$${isEntity ? '${name}Entity' : '${name}Model'}');
+      }
     } else {
       sb.write(' extends Equatable');
     }
@@ -506,6 +533,9 @@ class ClassDefinition {
     if (privateFields) {
       return '$_generatorTypeFunc\nclass ${isEntity ? '${name}Entity' : '${name}Model'}${_withInherite}{\n$_defaultPrivateConstructor\n\n$_gettersSetters\n\n$_jsonParseFunc\n\n$_jsonGenFunc\n\n$_entityGenFunc\n\n$_copyWithGenFunc\n\n$_propsGenFunc\n}\n$_withExtension';
     } else {
+      if (useRequest) {
+        return '$_generatorTypeFunc\nclass Request${name}Model${_withInherite}{\n$_defaultConstructor}\n';
+      }
       return '$_generatorTypeFunc\nclass ${isEntity ? '${name}Entity' : '${name}Model'}${_withInherite}{\n$_defaultConstructor\n\n$_jsonParseFunc\n\n$_jsonGenFunc\n\n$_entityGenFunc\n\n$_propsGenFunc\n\n$_copyWithGenFunc\n}\n$_withExtension';
     }
   }
